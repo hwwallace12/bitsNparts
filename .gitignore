@@ -38,3 +38,11 @@ node_modules/
 # Build outputs
 dist/
 build/
+
+# App data & SQLite databases
+data/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3

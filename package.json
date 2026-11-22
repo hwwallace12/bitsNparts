@@ -1,0 +1,20 @@
+{
+  "name": "bitsnparts",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Mobile-first workshop PWA and Gemini Vision scanner for drill bits, hole saws, and driver bits with SQLite inventory.",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "test": "node --test tests/*.test.js",
+    "check": "node --check server/index.js server/db.js server/gemini.js server/catalog.js public/js/app.js public/js/api.js public/js/camera.js public/js/caliper.js public/js/catalog-client.js public/js/dialogs.js public/js/dom.js public/js/calibration-mat.js public/sw.js"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "dependencies": {
+    "@google/genai": "^3.6.1",
+    "express": "^5.3.0"
+  }
+}

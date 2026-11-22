@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>bitsNparts — Drill &amp; Driver Bit Scanner</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icons/icon-180.png">
+  <link rel="stylesheet" href="/styles.css">
+  <script type="module" src="/js/app.js"></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="brand">
+        <img class="brand-icon" src="/icons/icon.svg" alt="" width="34" height="34">
+        <div>
+          <h1 class="brand-title">bitsNparts</h1>
+          <p class="brand-sub">Drill &amp; Driver Bit Scanner</p>
+        </div>
+      </div>
+      <div class="header-status">
+        <span id="gemini-status-badge" class="status-pill status-neutral">Checking AI...</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="app-main">
+    <div id="toast-region" class="toast-region" role="status" aria-live="polite" aria-atomic="true"></div>
+
+    <!-- TAB 1: SCAN -->
+    <section id="panel-scan" class="tab-panel" aria-labelledby="tab-scan">
+      <div class="card capture-card">
+        <div class="card-head">
+          <h2>Scan Drill &amp; Driver Bits</h2>
+          <p class="muted">Snap one bit up close or lay multiple bits out for batch scanning.</p>
+        </div>
+
+        <div id="camera-stage" class="camera-stage" hidden>
+          <video id="camera-video" playsinline muted autoplay></video>
+          <div class="camera-reticle" aria-hidden="true"></div>
+          <div class="camera-overlay-actions">
+            <button type="button" id="btn-torch" class="btn btn-secondary" hidden>Flash: Off</button>
+            <button type="button" id="btn-capture-frame" class="btn btn-primary">Capture Frame</button>
+            <button type="button" id="btn-stop-camera" class="btn btn-secondary">Close Camera</button>
+          </div>
+        </div>
+
+        <div id="preview-stage" class="preview-stage" hidden>
+          <div class="annotated-wrap">
+            <img id="scan-preview-img" alt="Captured drill bit photo preview">
+            <svg id="scan-boxes-svg" class="boxes-svg" viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-label="Detected bit bounding boxes"></svg>
+          </div>
+          <div class="toolbar preview-actions">
+            <button type="button" id="btn-open-caliper" class="btn btn-secondary">Caliper Measure</button>
+            <button type="button" id="btn-clear-photo" class="btn btn-ghost">Retake / Clear</button>
+          </div>
+          <p id="caliper-readout" class="caliper-banner" hidden></p>
+        </div>
+
+        <div id="empty-capture-box" class="empty-capture-box">
+          <p class="capture-hint">
+            Tip: For worn or tiny markings, lay bits beside a US Quarter, credit card, or the
+            <a href="/calibration-mat.html">printable calibration mat</a>.
+          </p>
+          <div class="toolbar capture-buttons">
+            <button type="button" id="btn-start-camera" class="btn btn-primary">Live Camera</button>
+            <label class="btn btn-secondary file-btn" for="input-camera-photo">
+              Take Photo
+              <input id="input-camera-photo" class="visually-hidden" type="file" accept="image/*" capture="environment">
+            </label>
+            <label class="btn btn-secondary file-btn" for="input-gallery-photo">
+              Upload Photo
+              <input id="input-gallery-photo" class="visually-hidden" type="file" accept="image/*">
+            </label>
+          </div>
+          <p id="camera-env-note" class="hint-note"></p>
+        </div>
+
+        <form id="scan-form" class="scan-form" novalidate>
+          <fieldset class="fieldset-compact">
+            <legend>Scan mode</legend>
+            <div class="pill-group">
+              <label class="pill-radio">
+                <input type="radio" name="scan_mode" value="auto" checked>
+                <span>Auto</span>
+              </label>
+              <label class="pill-radio">
+                <input type="radio" name="scan_mode" value="single">
+                <span>Single Bit</span>
+              </label>
+              <label class="pill-radio">
+                <input type="radio" name="scan_mode" value="batch">
+                <span>Batch Tray</span>
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset class="fieldset-compact">
+            <legend>Scale reference in photo</legend>
+            <div class="pill-group">
+              <label class="pill-radio">
+                <input type="radio" name="scale_reference" value="auto" checked>
+                <span>Auto / Etching</span>
+              </label>
+              <label class="pill-radio">
+                <input type="radio" name="scale_reference" value="mat">
+                <span>Calib. Mat</span>
+              </label>
+              <label class="pill-radio">
+                <input type="radio" name="scale_reference" value="quarter">
+                <span>US Quarter</span>
+              </label>
+              <label class="pill-radio">
+                <input type="radio" name="scale_reference" value="card">
+                <span>Credit Card</span>
+              </label>
+              <label class="pill-radio">
+                <input type="radio" name="scale_reference" value="hex_shank">
+                <span>1/4" Hex</span>
+              </label>
+            </div>
+          </fieldset>
+
+          <div class="field">
+            <label for="scan-notes">Optional context note (brand case, drawer, or clue)</label>
+            <input
+              type="text"
+              id="scan-notes"
+              name="notes"
+              placeholder="e.g. From blue masonry pouch, feels like 3/8 inch"
+              enterkeyhint="done"
+            >
+          </div>
+
+          <div class="toolbar scan-submit-row">
+            <button type="submit" id="btn-analyze" class="btn btn-primary btn-lg" disabled>
+              Identify Bits with Gemini
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <section id="scan-results-section" class="results-section" hidden>
+        <div class="section-head">
+          <div>
+            <h2>Identified Bits (<span id="scan-result-count">0</span>)</h2>
+            <p id="scan-scene-summary" class="muted"></p>
+          </div>
+          <div class="toolbar batch-save-bar">
+            <div class="inline-field">
+              <label for="batch-location">Save location</label>
+              <input
+                type="text"
+                id="batch-location"
+                list="location-options"
+                value="Main Drill Index"
+                enterkeyhint="done"
+              >
+            </div>
+            <button type="button" id="btn-save-all" class="btn btn-primary">Save All to Toolbox</button>
+          </div>
+        </div>
+
+        <div id="scan-results-grid" class="bit-grid"></div>
+      </section>
+    </section>
+
+    <!-- TAB 2: TOOLBOX -->
+    <section id="panel-toolbox" class="tab-panel" aria-labelledby="tab-toolbox" hidden>
+      <div class="card">
+        <div class="section-head">
+          <div>
+            <h2>Toolbox Inventory</h2>
+            <p id="toolbox-stats-line" class="muted">Loading inventory...</p>
+          </div>
+          <div class="toolbar">
+            <button type="button" id="btn-add-manual" class="btn btn-primary">+ Add Bit</button>
+            <a class="btn btn-secondary" href="/api/export?format=csv" download="bitsnparts-inventory.csv">CSV</a>
+            <a class="btn btn-secondary" href="/api/export?format=json" download="bitsnparts-inventory.json">JSON</a>
+          </div>
+        </div>
+
+        <form id="toolbox-filter-form" class="filter-grid">
+          <div class="field filter-search">
+            <label for="toolbox-search">Search bits</label>
+            <input
+              type="search"
+              id="toolbox-search"
+              name="q"
+              placeholder="Size (1/4, PH2, 6mm), brand, marking, material..."
+              autocorrect="off"
+              autocapitalize="none"
+              spellcheck="false"
+              enterkeyhint="search"
+            >
+          </div>
+          <div class="field">
+            <label for="filter-category">Type</label>
+            <select id="filter-category" name="category">
+              <option value="all">All types</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="filter-location">Location</label>
+            <select id="filter-location" name="location">
+              <option value="all">All locations</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="filter-condition">Condition</label>
+            <select id="filter-condition" name="condition">
+              <option value="all">All conditions</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="filter-sort">Sort by</label>
+            <select id="filter-sort" name="sort">
+              <option value="updated">Recently updated</option>
+              <option value="size">Diameter / Size</option>
+              <option value="location">Storage location</option>
+              <option value="name">Name</option>
+            </select>
+          </div>
+        </form>
+      </div>
+
+      <div id="toolbox-grid" class="bit-grid"></div>
+      <div id="toolbox-empty" class="card empty-state" hidden>
+        <h3>No matching bits yet</h3>
+        <p class="muted">Scan a drill bit from the Scan tab or add one manually to start tracking your workshop index.</p>
+      </div>
+    </section>
+
+    <!-- TAB 3: SETS -->
+    <section id="panel-sets" class="tab-panel" aria-labelledby="tab-sets" hidden>
+      <div class="card">
+        <div class="section-head">
+          <div>
+            <h2>Index &amp; Missing-Size Audit</h2>
+            <p class="muted">Compare your saved toolbox inventory against standard drill and driver sets.</p>
+          </div>
+          <button type="button" id="btn-copy-missing" class="btn btn-secondary">Copy Missing Sizes</button>
+        </div>
+
+        <div class="field">
+          <label for="set-selector">Reference set</label>
+          <select id="set-selector"></select>
+        </div>
+
+        <div id="set-summary-bar" class="set-summary-bar"></div>
+        <div id="set-slots-grid" class="set-slots-grid"></div>
+      </div>
+    </section>
+
+    <!-- TAB 4: TOOLS & HISTORY -->
+    <section id="panel-tools" class="tab-panel" aria-labelledby="tab-tools" hidden>
+      <div class="card">
+        <h2>Calibration &amp; Workshop Tools</h2>
+        <p class="muted">Print the 1:1 scale mat for unmarked bits, or verify your HX90 server and SQLite status.</p>
+        <div class="toolbar">
+          <a class="btn btn-primary" href="/calibration-mat.html">Open Printable Calibration Mat</a>
+          <button type="button" id="btn-refresh-health" class="btn btn-secondary">Refresh Server Status</button>
+        </div>
+        <dl id="server-status-dl" class="kv-list"></dl>
+      </div>
+
+      <div class="card">
+        <div class="section-head">
+          <div>
+            <h2>Recent Scans</h2>
+            <p class="muted">Tap any past scan to reload its photo and detected bits.</p>
+          </div>
+        </div>
+        <div id="scans-history-list" class="history-list"></div>
+      </div>
+    </section>
+  </main>
+
+  <nav class="bottom-nav" aria-label="Primary navigation">
+    <button type="button" id="tab-scan" class="tab-btn is-active" data-tab="scan" aria-pressed="true">
+      <span class="tab-icon" aria-hidden="true">📷</span>
+      <span>Scan</span>
+    </button>
+    <button type="button" id="tab-toolbox" class="tab-btn" data-tab="toolbox" aria-pressed="false">
+      <span class="tab-icon" aria-hidden="true">🧰</span>
+      <span>Toolbox</span>
+    </button>
+    <button type="button" id="tab-sets" class="tab-btn" data-tab="sets" aria-pressed="false">
+      <span class="tab-icon" aria-hidden="true">📏</span>
+      <span>Sets</span>
+    </button>
+    <button type="button" id="tab-tools" class="tab-btn" data-tab="tools" aria-pressed="false">
+      <span class="tab-icon" aria-hidden="true">⚙️</span>
+      <span>Tools</span>
+    </button>
+  </nav>
+
+  <datalist id="location-options">
+    <option value="Main Drill Index"></option>
+    <option value="Impact Driver Case"></option>
+    <option value="Masonry Drawer"></option>
+    <option value="Woodworking Cabinet"></option>
+    <option value="Hole Saw Tote"></option>
+    <option value="Wall Pegboard"></option>
+  </datalist>
+
+  <datalist id="manufacturer-options">
+    <option value="Milwaukee"></option>
+    <option value="DeWalt"></option>
+    <option value="Bosch"></option>
+    <option value="Makita"></option>
+    <option value="Irwin"></option>
+    <option value="Diablo"></option>
+    <option value="Ryobi"></option>
+    <option value="Wera"></option>
+    <option value="Wiha"></option>
+    <option value="Klein Tools"></option>
+    <option value="Craftsman"></option>
+    <option value="Unknown"></option>
+  </datalist>
+
+  <!-- DIALOG 1: Add / Edit Bit -->
+  <dialog id="edit-bit-dialog" closedby="closerequest" aria-labelledby="edit-bit-title">
+    <form id="edit-bit-form" class="dialog-form" novalidate>
+      <div class="dialog-head">
+        <h2 id="edit-bit-title">Add Bit</h2>
+        <button type="button" id="btn-close-edit" class="btn btn-ghost" aria-label="Close edit dialog">Close</button>
+      </div>
+
+      <input type="hidden" id="edit-bit-id" name="id">
+
+      <div class="form-two-col">
+        <div class="field">
+          <label for="bit-size">Size <span aria-hidden="true">*</span></label>
+          <input
+            type="text"
+            id="bit-size"
+            name="size_primary"
+            required
+            placeholder='1/4", 6mm, PH2, T25'
+            autocorrect="off"
+            autocapitalize="none"
+            spellcheck="false"
+            enterkeyhint="next"
+            autofocus
+          >
+        </div>
+        <div class="field">
+          <label for="bit-category">Category <span aria-hidden="true">*</span></label>
+          <select id="bit-category" name="category" required></select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="bit-name">Display Name <span aria-hidden="true">*</span></label>
+        <input type="text" id="bit-name" name="name" required placeholder='e.g. 1/4" Milwaukee Shockwave Masonry Bit' enterkeyhint="next">
+      </div>
+
+      <div class="form-two-col">
+        <div class="field">
+          <label for="bit-subtype">Bit Subtype</label>
+          <input type="text" id="bit-subtype" name="subtype" placeholder="Brad Point, Spade, Twist, Torx..." enterkeyhint="next">
+        </div>
+        <div class="field">
+          <label for="bit-manufacturer">Manufacturer</label>
+          <input type="text" id="bit-manufacturer" name="manufacturer" list="manufacturer-options" placeholder="Unknown" enterkeyhint="next">
+        </div>
+      </div>
+
+      <div class="form-two-col">
+        <div class="field">
+          <label for="bit-shank">Shank Type</label>
+          <input type="text" id="bit-shank" name="shank_type" placeholder='Round, 1/4" Hex, SDS-Plus' enterkeyhint="next">
+        </div>
+        <div class="field">
+          <label for="bit-coating">Material / Coating</label>
+          <input type="text" id="bit-coating" name="material_coating" placeholder="Cobalt M35, TiN, Carbide, S2" enterkeyhint="next">
+        </div>
+      </div>
+
+      <div class="form-two-col">
+        <div class="field">
+          <label for="bit-location">Storage Location</label>
+          <input type="text" id="bit-location" name="location" list="location-options" value="Main Drill Index" enterkeyhint="next">
+        </div>
+        <div class="field">
+          <label for="bit-quantity">Quantity</label>
+          <input type="text" id="bit-quantity" name="quantity" inputmode="numeric" pattern="\d+" value="1" enterkeyhint="next">
+        </div>
+      </div>
+
+      <fieldset class="fieldset-compact">
+        <legend>Condition / Wear</legend>
+        <div class="pill-group" id="edit-condition-group">
+          <label class="pill-radio"><input type="radio" name="condition" value="New"><span>✦ New</span></label>
+          <label class="pill-radio"><input type="radio" name="condition" value="Good" checked><span>✓ Good</span></label>
+          <label class="pill-radio"><input type="radio" name="condition" value="Worn"><span>⚠ Worn</span></label>
+          <label class="pill-radio"><input type="radio" name="condition" value="Damaged"><span>✕ Damaged</span></label>
+        </div>
+      </fieldset>
+
+      <div class="form-two-col">
+        <div class="field">
+          <label for="bit-metric-mm">Diameter (mm)</label>
+          <input type="text" id="bit-metric-mm" name="size_metric_mm" inputmode="decimal" placeholder="6.35" enterkeyhint="next">
+        </div>
+        <div class="field">
+          <label for="bit-markings">Stamped Markings</label>
+          <input type="text" id="bit-markings" name="markings_read" autocorrect="off" autocapitalize="none" spellcheck="false" placeholder="HSS 1/4" enterkeyhint="next">
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="bit-pilot">Pilot Hole / Fastener Match</label>
+        <input type="text" id="bit-pilot" name="pilot_or_fastener" placeholder="e.g. 3/16&quot; pilot for 1/4&quot; Tapcon" enterkeyhint="next">
+      </div>
+
+      <div class="field">
+        <label for="bit-speed">Speed / RPM &amp; Usage Notes</label>
+        <textarea id="bit-speed" name="usage_notes" rows="2" placeholder="Recommended materials, RPM range, cutting fluid, or drawer notes"></textarea>
+      </div>
+
+      <div class="dialog-actions">
+        <button type="button" id="btn-cancel-edit" class="btn btn-secondary">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Bit</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- DIALOG 2: Delete Confirmation -->
+  <dialog id="delete-confirm-dialog" closedby="closerequest" aria-labelledby="delete-confirm-title">
+    <form method="dialog" class="dialog-form">
+      <h2 id="delete-confirm-title">Delete bit?</h2>
+      <p id="delete-confirm-message" class="muted">This removes the entry from your SQLite toolbox inventory.</p>
+      <div class="dialog-actions">
+        <button type="submit" value="cancel" class="btn btn-secondary" autofocus>Cancel</button>
+        <button type="submit" id="delete-confirm-btn" value="confirm" class="btn btn-danger">Delete</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- DIALOG 3: Photo Caliper Measurement -->
+  <dialog id="caliper-dialog" class="dialog-wide" closedby="closerequest" aria-labelledby="caliper-title">
+    <form method="dialog" class="dialog-form">
+      <div class="dialog-head">
+        <h2 id="caliper-title">Photo Caliper Sizing</h2>
+        <button type="submit" value="cancel" class="btn btn-ghost">Close</button>
+      </div>
+
+      <div class="field">
+        <label for="caliper-ref-select">Known reference object in photo</label>
+        <select id="caliper-ref-select">
+          <option value="quarter">US Quarter (24.26 mm)</option>
+          <option value="card_w">Credit Card Width (85.60 mm)</option>
+          <option value="card_h">Credit Card Height (53.98 mm)</option>
+          <option value="mat_100">Calibration Mat 100mm Box</option>
+          <option value="hex_shank">1/4" Hex Shank Flats (6.35 mm)</option>
+        </select>
+      </div>
+
+      <p id="caliper-step-text" class="caliper-step">Step 1/2: Tap both edges of your reference object.</p>
+
+      <div class="caliper-canvas-wrap">
+        <canvas id="caliper-canvas"></canvas>
+      </div>
+
+      <p id="caliper-result-text" class="caliper-result">Waiting for reference endpoints...</p>
+
+      <div class="dialog-actions toolbar">
+        <button type="button" id="btn-caliper-reset-ref" class="btn btn-secondary">Reset Ref</button>
+        <button type="button" id="btn-caliper-reset-bit" class="btn btn-secondary">Reset Bit Line</button>
+        <button type="submit" value="cancel" class="btn btn-ghost">Cancel</button>
+        <button type="submit" id="btn-caliper-apply" value="apply" class="btn btn-primary" disabled>Use Measurement</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- DIALOG 4: Bit Detail Modal (light-dismiss) -->
+  <dialog id="bit-detail-dialog" closedby="any" aria-labelledby="bit-detail-title">
+    <form method="dialog" class="dialog-form">
+      <div class="dialog-head">
+        <h2 id="bit-detail-title">Bit Specifications</h2>
+        <button type="submit" value="close" class="btn btn-ghost">Close</button>
+      </div>
+      <div id="bit-detail-body" class="detail-body"></div>
+      <div class="dialog-actions">
+        <button type="submit" value="close" class="btn btn-primary">Done</button>
+      </div>
+    </form>
+  </dialog>
+</body>
+</html>

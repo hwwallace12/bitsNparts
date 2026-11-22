@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>bitsNparts — Printable 1:1 Calibration Mat</title>
+  <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/calibration-mat.css">
+  <script type="module" src="/js/calibration-mat.js"></script>
+</head>
+<body>
+  <header class="mat-controls no-print">
+    <div>
+      <h1>bitsNparts 1:1 Calibration Mat</h1>
+      <p>Print at <strong>100% / Actual Size</strong> (disable "Fit to Page"), then verify the 100mm square or Quarter circle with a ruler.</p>
+    </div>
+    <div class="mat-actions">
+      <button type="button" id="btn-print-mat" class="btn-print">Print at 100% Scale</button>
+      <a class="btn-back" href="/">Back to Scanner</a>
+    </div>
+  </header>
+
+  <main class="mat-page">
+    <div class="mat-sheet">
+      <div class="mat-header-strip">
+        <strong>bitsNparts CALIBRATION MAT</strong>
+        <span>PRINT AT 100% ACTUAL SIZE</span>
+      </div>
+
+      <div class="mat-top-grid">
+        <div class="fiducial-box" aria-label="100 millimeter by 100 millimeter calibration square">
+          <div class="fiducial-half fiducial-light">
+            <span>DARK BITS ZONE (Black Oxide / Masonry)</span>
+          </div>
+          <div class="fiducial-half fiducial-dark">
+            <span>BRIGHT BITS ZONE (HSS / TiN / Chrome)</span>
+          </div>
+          <div class="fiducial-label">100 mm &times; 100 mm FIDUCIAL SQUARE</div>
+        </div>
+
+        <div class="quarter-panel">
+          <div class="quarter-circle" aria-label="24.26mm US Quarter verification circle">
+            <span>US Quarter<br>24.26 mm</span>
+          </div>
+          <p class="verify-note">
+            <strong>Scale check:</strong> A real US Quarter fits cleanly inside this ring, and the main square measures exactly <strong>100 mm</strong>.
+          </p>
+        </div>
+      </div>
+
+      <section class="gauge-section" aria-label="Common bit diameter reference bars">
+        <h2>Common Drill Bit Width Reference (1:1 Scale)</h2>
+        <div id="diameter-gauges" class="diameter-gauges"></div>
+      </section>
+
+      <section class="rulers-section" aria-label="Metric and imperial calibration rulers">
+        <svg id="metric-ruler-svg" class="ruler-svg" viewBox="0 0 180 20" aria-label="Metric ruler 0 to 160 millimeters"></svg>
+        <svg id="imperial-ruler-svg" class="ruler-svg" viewBox="0 0 180 20" aria-label="Imperial ruler 0 to 6 inches"></svg>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

@@ -1,0 +1,26 @@
+services:
+  bitsnparts-web:
+    build: .
+    container_name: bitsnparts-app
+    ports:
+      - "8090:8090"
+    volumes:
+      - ./data:/app/data
+    env_file:
+      - path: ./.env
+        required: false
+    environment:
+      - NODE_ENV=production
+      - PORT=8090
+      - DATA_DIR=/app/data
+    restart: unless-stopped
+
+  bitsnparts-tunnel:
+    profiles:
+      - tunnel
+    image: cloudflare/cloudflared:latest
+    container_name: bitsnparts-tunnel
+    depends_on:
+      - bitsnparts-web
+    command: tunnel --no-autoupdate --url http://bitsnparts-web:8090
+    restart: unless-stopped
