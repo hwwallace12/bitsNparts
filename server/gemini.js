@@ -22,6 +22,35 @@ export class ConfigError extends Error {
 export const DEFAULT_GEMINI_MODEL = 'gemini-3.8-flash';
 export const DEFAULT_FALLBACK_MODEL = 'gemini-3.5-flash-lite';
 
+export const ALLOWED_MODELS = [
+  {
+    id: 'gemini-3.5-flash-lite',
+    label: 'Fast (3.5 Lite)',
+    description: 'Fastest (~2-3s) everyday scans',
+  },
+  {
+    id: 'gemini-3.8-flash',
+    label: 'Balanced (3.8 Flash)',
+    description: 'Higher visual detail for small markings',
+  },
+  {
+    id: 'gemini-4-argon',
+    label: 'Max Detail (4 Argon)',
+    description: 'Most accurate for worn markings & dense trays',
+  },
+];
+
+const ALLOWED_MODEL_IDS = new Set(ALLOWED_MODELS.map((m) => m.id));
+
+export function resolveAllowedModel(requestedModel, fallbackModel = DEFAULT_GEMINI_MODEL) {
+  const candidate = typeof requestedModel === 'string' ? requestedModel.trim() : '';
+  if (candidate && ALLOWED_MODEL_IDS.has(candidate)) {
+    return candidate;
+  }
+  const fallback = typeof fallbackModel === 'string' ? fallbackModel.trim() : '';
+  return ALLOWED_MODEL_IDS.has(fallback) ? fallback : DEFAULT_GEMINI_MODEL;
+}
+
 export function isTransientOverloadError(err) {
   return Boolean(
     err?.status === 503 ||
@@ -286,6 +315,7 @@ export function createGeminiAnalyzer({ apiKey, model, fallbackModel } = {}) {
     measuredMm = null,
     mode = 'auto',
     notes = '',
+    model: requestedModel = '',
   }) {
     const resolvedKey = (apiKey ?? process.env.GEMINI_API_KEY ?? '').trim();
     if (!resolvedKey) {
@@ -316,6 +346,13 @@ export function createGeminiAnalyzer({ apiKey, model, fallbackModel } = {}) {
 
     const promptText = promptLines.join('\n');
     const client = new GoogleGenAI({ apiKey: resolvedKey, apiVersion: 'v1beta' });
+    const primaryModel = resolveAllowedModel(requestedModel, activeModel);
+    const fallbackTarget =
+      primaryModel !== resolvedFallback
+        ? resolvedFallback
+        : primaryModel !== DEFAULT_GEMINI_MODEL
+          ? DEFAULT_GEMINI_MODEL
+          : '';
 
     const invokeModel = (modelName, timeoutMs) =>
       client.interactions.create(
@@ -341,21 +378,21 @@ export function createGeminiAnalyzer({ apiKey, model, fallbackModel } = {}) {
         { timeout: timeoutMs, maxRetries: 1 },
       );
 
-    let usedModel = activeModel;
+    let usedModel = primaryModel;
     let interaction;
     try {
-      interaction = await invokeModel(activeModel, 25000);
+      interaction = await invokeModel(primaryModel, 25000);
     } catch (err) {
       if (
         isTransientOverloadError(err) &&
-        resolvedFallback &&
-        resolvedFallback !== activeModel
+        fallbackTarget &&
+        fallbackTarget !== primaryModel
       ) {
         console.warn(
-          `Gemini model ${activeModel} transient overload/timeout (${err?.status || err?.statusCode || err?.message}); retrying with ${resolvedFallback}`,
+          `Gemini model ${primaryModel} transient overload/timeout (${err?.status || err?.statusCode || err?.message}); retrying with ${fallbackTarget}`,
         );
-        usedModel = resolvedFallback;
-        interaction = await invokeModel(resolvedFallback, 45000);
+        usedModel = fallbackTarget;
+        interaction = await invokeModel(fallbackTarget, 45000);
       } else {
         throw err;
       }

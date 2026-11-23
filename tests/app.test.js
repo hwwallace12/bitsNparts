@@ -5,7 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { computeSetAudit, normalizeSize, snapDiameterMm } from '../server/catalog.js';
 import { createDatabase } from '../server/db.js';
-import { normalizeAnalysisResult } from '../server/gemini.js';
+import { normalizeAnalysisResult, resolveAllowedModel } from '../server/gemini.js';
 import { createApp } from '../server/index.js';
 
 function makeTempDir(prefix = 'bitsnparts-test-') {
@@ -354,6 +354,13 @@ test('HTTP API integration: headers, scan flow, inventory CRUD, sets, export, an
     close();
     fs.rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('resolveAllowedModel validates allowlisted models and falls back safely', () => {
+  assert.equal(resolveAllowedModel('gemini-3.5-flash-lite', 'gemini-3.8-flash'), 'gemini-3.5-flash-lite');
+  assert.equal(resolveAllowedModel('gemini-4-argon', 'gemini-3.5-flash-lite'), 'gemini-4-argon');
+  assert.equal(resolveAllowedModel('gemini-1.5-pro', 'gemini-3.5-flash-lite'), 'gemini-3.5-flash-lite');
+  assert.equal(resolveAllowedModel('', 'gemini-3.8-flash'), 'gemini-3.8-flash');
 });
 
 test('POST /api/scan returns 503 when Gemini API key is missing', async () => {

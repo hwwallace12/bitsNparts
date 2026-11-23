@@ -127,6 +127,24 @@
             </div>
           </fieldset>
 
+          <fieldset class="fieldset-compact">
+            <legend>AI model</legend>
+            <div id="model-selector-group" class="pill-group">
+              <label class="pill-radio">
+                <input type="radio" name="scan_model" value="gemini-3.5-flash-lite" checked>
+                <span>Fast (3.5 Lite)</span>
+              </label>
+              <label class="pill-radio">
+                <input type="radio" name="scan_model" value="gemini-3.8-flash">
+                <span>Balanced (3.8 Flash)</span>
+              </label>
+              <label class="pill-radio">
+                <input type="radio" name="scan_model" value="gemini-4-argon">
+                <span>Max Detail (4 Argon)</span>
+              </label>
+            </div>
+          </fieldset>
+
           <div class="field">
             <label for="scan-notes">Optional context note (brand case, drawer, or clue)</label>
             <input

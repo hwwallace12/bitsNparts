@@ -685,15 +685,44 @@ async function loadSets() {
   }
 }
 
+const MODEL_STORAGE_KEY = 'bitsnparts_selected_model';
+
+function applySelectedModel(modelId, { persist = false } = {}) {
+  const radio = scanForm.querySelector(`input[name="scan_model"][value="${modelId}"]`);
+  if (radio) {
+    radio.checked = true;
+    if (persist) {
+      try {
+        localStorage.setItem(MODEL_STORAGE_KEY, modelId);
+      } catch {
+        // ignore storage quota errors
+      }
+    }
+  }
+  const active = getCheckedRadioValue(scanForm, 'scan_model', modelId || 'gemini-3.5-flash-lite');
+  if (geminiStatusBadge.classList.contains('status-ok')) {
+    geminiStatusBadge.textContent = `AI Ready · ${active}`;
+  }
+  return active;
+}
+
 async function loadHealth() {
   try {
     const health = await api.getHealth();
-    geminiStatusBadge.textContent = health.geminiConfigured ? `AI Ready · ${health.model}` : 'API Key Missing';
+    let savedModel = '';
+    try {
+      savedModel = localStorage.getItem(MODEL_STORAGE_KEY) || '';
+    } catch {
+      savedModel = '';
+    }
+    const activeModel = applySelectedModel(savedModel || health.model);
+    geminiStatusBadge.textContent = health.geminiConfigured ? `AI Ready · ${activeModel}` : 'API Key Missing';
     geminiStatusBadge.className = health.geminiConfigured ? 'status-pill status-ok' : 'status-pill status-warn';
 
     const rows = [
       ['Service', health.service],
-      ['AI Model', health.model],
+      ['Default AI Model', health.model],
+      ['Selected Model', activeModel],
       ['Gemini Key', health.geminiConfigured ? 'Configured' : 'Missing (.env GEMINI_API_KEY)'],
       ['SQLite DB', health.sqlite?.ok ? `Healthy (${health.sqlite.distinctEntries} entries / ${health.sqlite.totalQuantity} qty)` : 'Error'],
       ['Saved Scans', String(health.sqlite?.scanCount ?? 0)],
@@ -871,22 +900,32 @@ function wireEvents() {
     }
   });
 
+  for (const radio of scanForm.querySelectorAll('input[name="scan_model"]')) {
+    radio.addEventListener('change', () => {
+      if (radio.checked) {
+        applySelectedModel(radio.value, { persist: true });
+      }
+    });
+  }
+
   scanForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (!state.currentPhotoDataUrl) {
       showToast('Take or upload a photo first.', 'error');
       return;
     }
+    const chosenModel = getCheckedRadioValue(scanForm, 'scan_model', 'gemini-3.5-flash-lite');
     btnAnalyze.disabled = true;
     const origText = btnAnalyze.textContent;
-    btnAnalyze.textContent = 'Analyzing with Gemini Vision...';
-    showToast('Inspecting bit geometry, stamped markings, and wear...');
+    btnAnalyze.textContent = `Analyzing with ${chosenModel}...`;
+    showToast(`Inspecting bit geometry, stamped markings, and wear (${chosenModel})...`);
 
     try {
       const payload = {
         imageDataUrl: state.currentPhotoDataUrl,
         mode: getCheckedRadioValue(scanForm, 'scan_mode', 'auto'),
         scaleReference: getCheckedRadioValue(scanForm, 'scale_reference', 'auto'),
+        model: chosenModel,
         measuredMm: state.measuredMm,
         notes: scanNotesInput.value.trim(),
       };
@@ -895,7 +934,8 @@ function wireEvents() {
       state.scanBits = (result.bits || []).map((b, i) => ({ ...b, index: b.index ?? i }));
       state.highlightedIndex = state.scanBits.length ? 0 : null;
       renderScanResults();
-      showToast(`Identified ${state.scanBits.length} bit(s).`, 'ok');
+      const usedModel = result.model_used || result.scan?.model_used || chosenModel;
+      showToast(`Identified ${state.scanBits.length} bit(s) with ${usedModel}.`, 'ok');
     } catch (err) {
       showToast(err.message, 'error');
     } finally {

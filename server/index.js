@@ -11,7 +11,13 @@ import {
   snapDiameterMm,
 } from './catalog.js';
 import { createDatabase } from './db.js';
-import { ConfigError, DEFAULT_GEMINI_MODEL, createGeminiAnalyzer } from './gemini.js';
+import {
+  ALLOWED_MODELS,
+  ConfigError,
+  DEFAULT_GEMINI_MODEL,
+  createGeminiAnalyzer,
+  resolveAllowedModel,
+} from './gemini.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -188,6 +194,7 @@ export function createApp({
       categories: CATEGORIES,
       conditions: CONDITIONS,
       scaleReferences: Object.values(SCALE_REFERENCES),
+      models: ALLOWED_MODELS,
       geminiConfigured: hasGeminiKey,
       model: activeAnalyzer.model || activeModel,
     });
@@ -200,6 +207,7 @@ export function createApp({
       measuredMm = null,
       mode = 'auto',
       notes = '',
+      model: requestedModel = '',
     } = req.body || {};
 
     if (!imageDataUrl || typeof imageDataUrl !== 'string') {
@@ -226,6 +234,7 @@ export function createApp({
     }
 
     const safeScale = Object.hasOwn(SCALE_REFERENCES, scaleReference) ? scaleReference : 'auto';
+    const safeModel = resolveAllowedModel(requestedModel, activeAnalyzer.model || activeModel);
     const parsedMeasuredMm =
       measuredMm !== null && measuredMm !== undefined && measuredMm !== '' && Number(measuredMm) > 0
         ? Number(Number(measuredMm).toFixed(2))
@@ -249,9 +258,10 @@ export function createApp({
         measuredMm: parsedMeasuredMm,
         mode,
         notes,
+        model: safeModel,
       });
 
-      const usedModel = analysis.model_used || activeAnalyzer.model || activeModel;
+      const usedModel = analysis.model_used || safeModel;
       const scan = db.createScan({
         imageFilename,
         scaleReference: safeScale,
