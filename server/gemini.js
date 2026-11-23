@@ -28,7 +28,12 @@ export function isTransientOverloadError(err) {
       err?.statusCode === 503 ||
       err?.status === 429 ||
       err?.statusCode === 429 ||
-      /\b(503|429|high demand|overloaded|unavailable)\b/i.test(String(err?.message || '')),
+      err?.name === 'AbortError' ||
+      err?.name === 'TimeoutError' ||
+      err?.name === 'ContinuationTimeoutError' ||
+      /\b(503|429|high demand|overloaded|unavailable|timed out|timeout|aborted)\b/i.test(
+        String(err?.message || ''),
+      ),
   );
 }
 
@@ -312,31 +317,34 @@ export function createGeminiAnalyzer({ apiKey, model, fallbackModel } = {}) {
     const promptText = promptLines.join('\n');
     const client = new GoogleGenAI({ apiKey: resolvedKey, apiVersion: 'v1beta' });
 
-    const invokeModel = (modelName) =>
-      client.interactions.create({
-        model: modelName,
-        store: false,
-        system_instruction: SYSTEM_INSTRUCTION,
-        input: [
-          { type: 'text', text: promptText },
-          {
-            type: 'image',
-            data: base64Data,
-            mime_type: mimeType,
-            resolution: 'high',
+    const invokeModel = (modelName, timeoutMs) =>
+      client.interactions.create(
+        {
+          model: modelName,
+          store: false,
+          system_instruction: SYSTEM_INSTRUCTION,
+          input: [
+            { type: 'text', text: promptText },
+            {
+              type: 'image',
+              data: base64Data,
+              mime_type: mimeType,
+              resolution: 'high',
+            },
+          ],
+          response_format: {
+            type: 'text',
+            mime_type: 'application/json',
+            schema: SCAN_RESPONSE_SCHEMA,
           },
-        ],
-        response_format: {
-          type: 'text',
-          mime_type: 'application/json',
-          schema: SCAN_RESPONSE_SCHEMA,
         },
-      });
+        { timeout: timeoutMs, maxRetries: 1 },
+      );
 
     let usedModel = activeModel;
     let interaction;
     try {
-      interaction = await invokeModel(activeModel);
+      interaction = await invokeModel(activeModel, 25000);
     } catch (err) {
       if (
         isTransientOverloadError(err) &&
@@ -344,10 +352,10 @@ export function createGeminiAnalyzer({ apiKey, model, fallbackModel } = {}) {
         resolvedFallback !== activeModel
       ) {
         console.warn(
-          `Gemini model ${activeModel} transient overload (${err?.status || err?.statusCode || err?.message}); retrying with ${resolvedFallback}`,
+          `Gemini model ${activeModel} transient overload/timeout (${err?.status || err?.statusCode || err?.message}); retrying with ${resolvedFallback}`,
         );
         usedModel = resolvedFallback;
-        interaction = await invokeModel(resolvedFallback);
+        interaction = await invokeModel(resolvedFallback, 45000);
       } else {
         throw err;
       }
